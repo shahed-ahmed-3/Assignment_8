@@ -1,9 +1,9 @@
 import { ConflictException,notFoundException } from '../../common/exceptions/error.exception.js';
-import { compare, hash } from '../../common/security/index.js';
+import { compare, decryption, encryption, hash } from '../../common/security/index.js';
 import { UserModel } from '../../DB/Model/user.model.js';
 import { createOne, findOne } from './../../common/repository/index.js';
 
-export const signup = async({userName , email ,password})=>{
+export const signup = async({userName , email ,password ,phone})=>{
     const duplicatedAccount = await findOne({
       model : UserModel,
       filter:{email},
@@ -15,7 +15,8 @@ export const signup = async({userName , email ,password})=>{
     data:{
       userName , 
       email ,
-      password : await hash(password)
+      password : await hash(password),
+      phone: await encryption(phone)
     }
   })
   return account
@@ -29,5 +30,6 @@ export const login = async({email,password})=>{
     if(!account) throw notFoundException("Not Exist")
     const match = await compare(password, account.password)
     if(!match) throw notFoundException("Not Exist")
+    account.phone = await decryption(account.phone)
   return account
 }

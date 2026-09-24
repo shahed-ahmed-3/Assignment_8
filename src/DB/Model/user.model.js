@@ -28,7 +28,7 @@ const userSchema = new mongoose.Schema(
             required:true
         },
 
-        Phone : String,
+        phone : String,
         DOB: Date,
         confirmEmail : Date,
         image : String,
