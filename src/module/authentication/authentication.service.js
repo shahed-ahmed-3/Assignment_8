@@ -1,9 +1,9 @@
 import { ConflictException,notFoundException } from '../../common/exceptions/error.exception.js';
-import { compare, decryption, encryption, hash } from '../../common/security/index.js';
+import { compare, createLoginCredentials, decryption, encryption, hash } from '../../common/security/index.js';
 import { UserModel } from '../../DB/Model/user.model.js';
 import { createOne, findOne } from './../../common/repository/index.js';
 
-export const signup = async({userName , email ,password ,phone})=>{
+export const signup = async({userName , email ,password ,phone,role})=>{
     const duplicatedAccount = await findOne({
       model : UserModel,
       filter:{email},
@@ -16,13 +16,15 @@ export const signup = async({userName , email ,password ,phone})=>{
       userName , 
       email ,
       password : await hash(password),
-      phone: await encryption(phone)
+      phone: await encryption(phone),
+      role
     }
   })
+  // console.log("Role received from Postman:", account.role);
   return account
 }
 
-export const login = async({email,password})=>{
+export const login = async({email,password}, issuer)=>{
  const account = await findOne({
       model : UserModel,
       filter:{email},
@@ -31,5 +33,5 @@ export const login = async({email,password})=>{
     const match = await compare(password, account.password)
     if(!match) throw notFoundException("Not Exist")
     account.phone = await decryption(account.phone)
-  return account
+    return await createLoginCredentials({user:account , issuer})
 }

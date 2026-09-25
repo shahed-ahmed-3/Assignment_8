@@ -9,7 +9,7 @@ router.post("/signup" , async(req,res,next)=>{
 })
 
 router.post("/login" , async(req,res,next)=>{
-    const data = await login(req.body)
+    const data = await login(req.body,`${req.protocol}://${req.host}`)
     return successResponse({res , data})
 })
 

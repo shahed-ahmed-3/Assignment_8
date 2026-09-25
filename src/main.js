@@ -1,7 +1,7 @@
 import express from "express";
 import {bootstrapDB}  from './DB/connection.db.js'
 import { globalErrorHandling } from './middleware/error.middleware.js';
-import { authenticationController } from "./module/index.js";
+import { authenticationController, userController } from "./module/index.js";
 const app = express()
 const port = 3000;
 app.use(express.json());
@@ -10,7 +10,7 @@ bootstrapDB(app, port);
 
 app.use("/auth" ,authenticationController)
 // app.use("/message",messageController);
-// app.use("/users",userController);
+app.use("/user",userController);
 
 
 
