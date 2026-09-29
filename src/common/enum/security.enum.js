@@ -2,3 +2,8 @@ export const TokenTypeEnum = {
     ACCESS:0,
     REFRESH:1
 }
+
+export const LanguageEnum = {
+    AR:0,
+    EN:1
+}

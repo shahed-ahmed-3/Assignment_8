@@ -17,7 +17,7 @@ router.post("/singup-with-gmail", async (req, res, next) => {
 });
 
 router.post("/login" , validation(validators.login), async(req,res,next)=>{
-    const data = await login(req.validate,`${req.protocol}://${req.host}`)
+    const data = await login(req.validate.body,`${req.protocol}://${req.host}`)
     return successResponse({res , data})
 })
 
