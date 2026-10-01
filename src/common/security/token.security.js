@@ -1,9 +1,23 @@
 import jwt from 'jsonwebtoken'
 import { RoleEnum, TokenTypeEnum } from './../enum/index.js';
 import { ACCESS_ADMIN_TOKEN_SIGNATURE, ACCESS_TOKEN_EXPIRES_IN, ACCESS_USER_TOKEN_SIGNATURE, REFRESH_ADMIN_TOKEN_SIGNATURE, REFRESH_TOKEN_EXPIRES_IN, REFRESH_USER_TOKEN_SIGNATURE } from '../../config.js'
-import { BadException, notFoundException } from '../exceptions/error.exception.js'
+import { BadException, notFoundException, UnauthorizedException } from '../exceptions/error.exception.js'
 import { findById } from '../repository/db.repository.js'
 import { UserModel } from '../../DB/Model/user.model.js'
+import {randomUUID} from 'node:crypto'
+import { exist, set } from '../services/index.js';
+
+export const userBaseKey = ({userId})=>{
+    return `User::${userId.toString()}`
+}
+
+export const userBaseRevokeTokenKey = ({userId})=>{
+    return `${userBaseKey({userId})}::Revoke_Token`
+}
+
+export const userRevokeTokenKey = ({userId , jti})=>{
+    return `User::${userBaseRevokeTokenKey({userId})}::${jti}`
+}
 
 export const createToken = async({
     payload={},
@@ -58,12 +72,18 @@ export const decodeToken = async({
     if (!payload.sub) {
         throw BadException("missing token payload")
     }
+    if (await exist({key : userRevokeTokenKey({userId:payload.sub , jti:payload.jti})})) {
+        throw UnauthorizedException("Expire login credentials")
+    }
     const user = await findById({
         model:UserModel,
         id:payload.sub
     })
     if (!user) {
         throw notFoundException("Invalid user")
+    }
+    if ((user.changeCredentialTime?.getTime() ?? 0 )> payload.iat*1000) {
+        UnauthorizedException("Expire login credentials")
     }
     return {user , payload} 
 }
@@ -74,6 +94,7 @@ export const createLoginCredentials = async({
     options = {}
 })=>{
     const { accessSignature , refreshSignature } = await getTokenSignature({ role:user.role })
+    const jwtid = randomUUID()
     const access_token = await createToken({
         payload: {sub:user._id},
         secret:accessSignature,
@@ -81,7 +102,8 @@ export const createLoginCredentials = async({
             ...options,
             issuer,
             audience:[user.role],
-            expiresIn:ACCESS_TOKEN_EXPIRES_IN
+            expiresIn:ACCESS_TOKEN_EXPIRES_IN,
+            jwtid
     }
     })
 
@@ -92,9 +114,19 @@ export const createLoginCredentials = async({
             ...options,
             issuer,
             audience:[user.role],
-            expiresIn:REFRESH_TOKEN_EXPIRES_IN
+            expiresIn:REFRESH_TOKEN_EXPIRES_IN,
+            jwtid
       },
     })
     console.log({ accessSignature , refreshSignature });
   return {access_token , refresh_token}
+}
+
+export const createRevokeToken = async({payload})=>{
+        const consumedTime = (Math.ceil(Date.now() / 1000) - payload.iat)
+        const refreshExpiresIn = payload.iat + REFRESH_TOKEN_EXPIRES_IN
+        const ttl = refreshExpiresIn - consumedTime
+        console.log({payload , consumedTime , refreshExpiresIn , ttl});
+        await set({key:userRevokeTokenKey({userId:payload.sub , jti:payload.jti}) , value : payload.jti , ttl})
+        return;
 }

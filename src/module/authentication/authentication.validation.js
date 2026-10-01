@@ -15,10 +15,10 @@ export const login = (lang)=>{
     query:z.strictObject({
         lang:z.enum(["ar","en"]).default("ar"),
         // darkMood:z.coerce.boolean()
-        darkMood:z.stringbool({
-            truthy:["true" , "1" , "yes"],
-            falsy:["false" , "0" , "no"]
-        })
+        // darkMood:z.stringbool({
+        //     truthy:["true" , "1" , "yes"],
+        //     falsy:["false" , "0" , "no"]
+        // })
     })
 })
 }

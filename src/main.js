@@ -7,7 +7,7 @@ const app = express()
 const port = 3000;
 app.use(cors())
 app.use(express.json());
-bootstrapDB(app, port);
+await bootstrapDB(app, port);
 
 
 app.use("/auth" ,authenticationController)
