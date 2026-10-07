@@ -21,7 +21,8 @@ const matchFields = ({original , copy , data , ctx , lang})=>{
 }
 
 export const generalValidationFields = {
-    email: (lang) => z.email({message: getValidationMessage(lang,202)}).regex(/^[a-zA-Z0-9._%+-]+@(gmail|yahoo|icloud)+\.(com|net|edu)$/),
+    email: (lang) => z.email({message: getValidationMessage(lang,202)}),
+    otp:(lang) => z.string().regex(/^\d{6}$/ , {message:'Invalid Code'}),
     password: (lang) => z.string({message:getValidationMessage(lang,303)}).regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/),
     userName: (lang) => z.string().min(2 , {message: getValidationMessage(lang,102)}).max(30 , {message: getValidationMessage(lang,103)}),
     phone: (lang) => z.string({message: getValidationMessage(lang,402)}).regex(/^(00201|201|\+201|01)[0125][0-9]{8}$/),

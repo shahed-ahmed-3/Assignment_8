@@ -21,6 +21,7 @@
     "jsonwebtoken": "^9.0.3",
     "mongodb": "^7.6.0",
     "mongoose": "^9.9.4",
+    "nodemailer": "^10.0.14",
     "redis": "^6.3.0",
     "zod": "^4.6.5"
   }

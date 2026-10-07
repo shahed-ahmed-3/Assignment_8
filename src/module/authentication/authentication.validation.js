@@ -23,6 +23,44 @@ export const login = (lang)=>{
 })
 }
 
+export const confirmEmail = (lang)=>{
+    return z.object({
+    body:z.strictObject({
+        email:generalValidationFields.email(lang),
+        otp:generalValidationFields.otp(lang),
+    }),
+})
+}
+
+export const resendConfirmEmail = (lang)=>{
+    return z.object({
+    body:z.strictObject({
+        email:generalValidationFields.email(lang),
+    }),
+})
+}
+
+export const resetForgetPassword = (lang)=>{
+    return z.object({
+    body:z.strictObject({
+        email:generalValidationFields.email(lang),
+        otp:generalValidationFields.otp(lang),
+        password:generalValidationFields.password(lang),
+        confirmPassword:generalValidationFields.password(lang),
+}).superRefine((data , ctx)=>{
+    generalValidationFields.matchFields({original:"password" , copy:"confirmPassword" , data , ctx ,lang})
+}),
+})
+}
+
+export const requestForgotPassword = (lang)=>{
+    return z.object({
+    body:z.strictObject({
+        email:generalValidationFields.email(lang),
+    }),
+})
+}
+
 export const signup = (lang)=>{
     return z.object({
     body: loginSchema(lang).safeExtend({

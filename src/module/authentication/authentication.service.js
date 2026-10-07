@@ -1,10 +1,35 @@
-import { ProviderEnum } from '../../common/enum/user.enum.js';
-import { BadException, ConflictException,notFoundException } from '../../common/exceptions/error.exception.js';
-import { compare, createLoginCredentials, decryption, encryption, hash } from '../../common/security/index.js';
+import { ProviderEnum,EmailSubjectEnum } from '../../common/enum/index.js';
+import { BadException, ConflictException,notFoundException, TooManyRequestException } from '../../common/exceptions/error.exception.js';
+import { compare, createLoginCredentials, decryption, encryption, hash, userBaseRevokeTokenKey } from '../../common/security/index.js';
+import { del, expire, get, incrBy, keys, set, ttl } from '../../common/services/cache.service.js';
+import { createOtp, emailEvent, UserEmailKey, UserEmailTrialsKey } from '../../common/utils/index.js';
 import { WEB_CLIENT_IDS } from '../../config.js';
 import { UserModel } from '../../DB/Model/user.model.js';
 import { createOne, findOne } from './../../common/repository/index.js';
 import {OAuth2Client} from 'google-auth-library';
+
+const sendEmailOtp = async({email , subject , expiresIn = 120 , maxTrials=3 , blockInSeconds = 300 })=>{
+  const existOTP_Ttl = await ttl({key:UserEmailKey({email , subject})})
+  if (existOTP_Ttl>0) {
+    throw ConflictException(`Sorry we cannot create new otp while existing one still valid please try again later after ${existOTP_Ttl}s`)
+  }
+  const oldTrials = await get({key:UserEmailTrialsKey({email , subject})})??0
+  if (oldTrials >= maxTrials) {
+    throw TooManyRequestException('Max otp trials has been reached')
+  }
+
+  const code = createOtp()
+  await set({
+    key:UserEmailKey({email , subject}),
+    value:await hash(code.toString()),
+    ttl:expiresIn
+  })
+  const currentTrials = await incrBy({key:UserEmailTrialsKey({email , subject})})
+  if (currentTrials == 3) {
+    await expire({key:UserEmailTrialsKey({email , subject}) , ttl:blockInSeconds})
+  }
+  emailEvent.emit("sendEmail" , {recipients:{to:email} , subject:subject , data:{code}})
+}
 
 export const signup = async({userName , email ,password ,phone,role})=>{
     const duplicatedAccount = await findOne({
@@ -20,11 +45,100 @@ export const signup = async({userName , email ,password ,phone,role})=>{
       email ,
       password : await hash(password),
       phone: await encryption(phone),
+      provider: ProviderEnum.SYSTEM,
       role
     }
   })
-  // console.log("Role received from Postman:", account.role);
+  console.log("AFTER SAVE HASH IN DB:", account.password);
+  await sendEmailOtp({email , subject:EmailSubjectEnum.CONFIRM_EMAIL})
   return account
+}
+
+export const confirmEmail = async({otp , email})=>{
+    const account = await findOne({
+      model : UserModel,
+      filter:{
+        email , 
+        provider: ProviderEnum.SYSTEM,
+        confirmEmail:{$exists:false}
+      },
+      options:{select:"email" }
+    })
+    if(!account) throw notFoundException("Invalid account")
+      const hashOtp = await get({key: UserEmailKey({email , subject:EmailSubjectEnum.CONFIRM_EMAIL})})
+    if (!hashOtp || !await compare(otp , hashOtp)) {
+      throw ConflictException("Invalid otp")
+    }
+
+    account.confirmEmail = new Date()
+    await account.save()
+    await del({key: await keys({prefix:UserEmailKey({email , subject:EmailSubjectEnum.CONFIRM_EMAIL})})})
+    return
+}
+
+export const resendConfirmEmail = async({email})=>{
+    const account = await findOne({
+      model : UserModel,
+      filter:{
+        email , 
+        provider: ProviderEnum.SYSTEM,
+        confirmEmail:{$exists:false}
+      },
+      options:{select:"email" }
+    })
+    if(!account) throw notFoundException("Invalid account")
+
+    await sendEmailOtp({email , subject:EmailSubjectEnum.CONFIRM_EMAIL})
+    
+    return
+}
+
+export const requestForgotPasswordCode = async({email})=>{
+    const account = await findOne({
+      model : UserModel,
+      filter:{
+        email , 
+        provider: ProviderEnum.SYSTEM,
+        confirmEmail:{$exists:true}
+      },
+      options:{select:"email" }
+    })
+    if(!account) throw notFoundException("Invalid account")
+
+    await sendEmailOtp({email , subject:EmailSubjectEnum.FORGOT_PASSWORD})
+    
+    return
+}
+
+export const verifyForgetPasswordCode = async({otp , email})=>{
+    const account = await findOne({
+      model : UserModel,
+      filter:{
+        email , 
+        provider: ProviderEnum.SYSTEM,
+        confirmEmail:{$exists:true}
+      },
+      options:{select:"email" }
+    })
+    if(!account) throw notFoundException("Invalid account")
+      const hashOtp = await get({key: UserEmailKey({email , subject:EmailSubjectEnum.FORGOT_PASSWORD})})
+    if (!hashOtp || !await compare(otp , hashOtp)) {
+      throw ConflictException("Invalid otp")
+    }
+    return account ;
+}
+
+export const resetForgetPassword = async({otp , email , password})=>{
+    const account = await verifyForgetPasswordCode({email , otp})
+    account.password = await hash(password)
+    account.changeCredentialsTime = new Date()
+    await account.save()
+    const result = await Promise.all([ 
+      keys({prefix : userBaseRevokeTokenKey({userId:account._id})}) , 
+      keys({prefix:UserEmailKey({email , subject:EmailSubjectEnum.FORGOT_PASSWORD})})
+    ])
+    await del({key: [...result[0] , ...result[1]] })
+    return
 }
 
 /*
@@ -91,11 +205,16 @@ export const signupWithGmail = async({idToken} , issuer)=>{
 export const login = async({email,password}, issuer)=>{
  const account = await findOne({
       model : UserModel,
-      filter:{email , provider:ProviderEnum.SYSTEM},
+      filter:{
+        email , 
+        provider: ProviderEnum.SYSTEM,
+        confirmEmail:{$exists:true}
+      },
     })
+    console.log("LOGIN ACCOUNT RESULT:", account)
     if(!account) throw notFoundException("Not Exist")
     const match = await compare(password, account.password)
-    if(!match) throw notFoundException("Not Exist")
+    if(!match) throw notFoundException("Invalid Password");
     account.phone = await decryption(account.phone)
     return await createLoginCredentials({user:account , issuer})
 }
