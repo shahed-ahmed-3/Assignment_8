@@ -1,10 +1,24 @@
 import { Router } from "express";
 import { successResponse } from "../../common/utils/success.response.js";
 import { logout, profile, rotateToken, update } from "./user.service.js";
-import { authentication, authorization } from "../../middleware/index.js";
+import { authentication, authorization, uploadMiddleware } from "../../middleware/index.js";
 import { RoleEnum, TokenTypeEnum } from "../../common/enum/index.js";
+import { localFileUpload , fileValidation } from "../../common/utils/index.js";
 const router = Router()
 
+router.patch(
+    "/profile-image" ,
+    authentication(),
+    uploadMiddleware({
+        multerMiddleware:localFileUpload({maxFileSize : 2}).single('attachment'),
+        customPath:'users',
+        validation:fileValidation.image
+    }),
+    async(req,res,next)=>{
+        req.user.image = req.file.finalPath
+        await req.user.save()
+    return successResponse({res,data : {user:req.user}})
+})
 
 router.get("/" ,authentication() , async(req,res,next)=>{
     const data = await profile(req.user)

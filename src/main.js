@@ -6,6 +6,7 @@ import cors from 'cors'
 const app = express()
 const port = 3000;
 app.use(cors())
+app.use("/assets" , express.static("./assets"))
 app.use(express.json());
 await bootstrapDB(app, port);
 
