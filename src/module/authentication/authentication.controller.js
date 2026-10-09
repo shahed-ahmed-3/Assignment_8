@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { successResponse } from "../../common/utils/success.response.js";
-import { confirmEmail, login, requestForgotPasswordCode, resendConfirmEmail, resetForgetPassword, signup, signupWithGmail, verifyForgetPasswordCode } from "./authentication.service.js";
+import { confirmEmail, confirmLogin2FA, login, requestEnable2FA, requestForgotPasswordCode, resendConfirmEmail, resetForgetPassword, signup, signupWithGmail, verifyAndEnable2FA, verifyForgetPasswordCode } from "./authentication.service.js";
 import * as validators from './authentication.validation.js'
-import { validation } from "../../middleware/index.js";
+import { authentication, validation } from "../../middleware/index.js";
 const router = Router();
 
 router.post("/signup" ,validation(validators.signup), async(req,res,next)=>{
@@ -44,5 +44,20 @@ router.post("/login" , validation(validators.login), async(req,res,next)=>{
     const data = await login(req.validate.body,`${req.protocol}://${req.host}`)
     return successResponse({res , data})
 })
+
+router.post("/login-confirm", async (req, res, next) => {
+    const data = await confirmLogin2FA(req.body, `${req.protocol}://${req.host}`);
+    return successResponse({ res, data });
+});
+
+router.post("/2fa/enable-request", authentication(), async (req, res, next) => {
+    const data = await requestEnable2FA(req.user._id);
+    return successResponse({ res, data });
+});
+
+router.post("/2fa/enable-verify", authentication(), async (req, res, next) => {
+    const data = await verifyAndEnable2FA(req.user._id, req.body);
+    return successResponse({ res, data });
+});
 
 export default router;

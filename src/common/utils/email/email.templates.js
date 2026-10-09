@@ -343,7 +343,13 @@ export const templates ={
 
 </body>
 </html>`
-    }
+    },
+    [EmailSubjectEnum.ENABLE_2FA]: ({ code }) => {
+    return `<h1>Enable 2-Step Verification</h1><p>Your verification code is: <b>${code}</b></p>`;
+    },
+    [EmailSubjectEnum.LOGIN_2FA]: ({ code }) => {
+    return `<h1>Login Verification Code</h1><p>Your 2FA login code is: <b>${code}</b></p>`;
+  },
 }
 
 export const verifyEmailTemplate = (data) => {
